@@ -1,0 +1,13 @@
+{
+  "name": "防災マップ",
+  "short_name": "防災マップ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E53E3E",
+  "description": "オフラインでも使える地域防災インフラマップ",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
