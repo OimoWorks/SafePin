@@ -1,6 +1,8 @@
 import { Pin } from './types'
 
-export const DUMMY_PINS: Pin[] = [
+// ── ダミーデータ（実データ生成前のフォールバック） ──────────────────────────
+
+const FALLBACK_PINS: Pin[] = [
   {
     id: '1',
     category: 'shelter',
@@ -62,3 +64,8 @@ export const DUMMY_PINS: Pin[] = [
     updatedAt: '2026-06-01',
   },
 ]
+
+export const DUMMY_PINS: Pin[] = FALLBACK_PINS
+// 実データに置き換える場合: scripts/build_pins.py を実行後、
+// FALLBACK_PINS の定義を pins-data.json の内容で上書きしてください。
+// または scripts/generate_pins_ts.py で lib/pins.ts を自動生成してください。

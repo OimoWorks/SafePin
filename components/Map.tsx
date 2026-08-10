@@ -8,6 +8,7 @@ import { DUMMY_PINS } from '@/lib/pins'
 import { savePins, saveLastUpdated } from '@/lib/indexeddb'
 import CategoryFilter from './CategoryFilter'
 import PinDetail from './PinDetail'
+import Attribution from './Attribution'
 
 const ALL_CATEGORIES = new Set<PinCategory>(['shelter', 'toilet', 'water', 'aed'])
 
@@ -55,11 +56,9 @@ export default function Map() {
 
     leafletMap.current = map
 
-    // Save pins to IndexedDB
     savePins(DUMMY_PINS)
     saveLastUpdated(new Date().toLocaleDateString('ja-JP'))
 
-    // Add markers
     for (const pin of DUMMY_PINS) {
       const marker = L.marker([pin.lat, pin.lng], { icon: createPinIcon(pin.category) })
       marker.on('click', () => setSelectedPin(pin))
@@ -73,7 +72,6 @@ export default function Map() {
     }
   }, [])
 
-  // Toggle category visibility
   useEffect(() => {
     if (!leafletMap.current) return
     for (const pin of DUMMY_PINS) {
@@ -97,7 +95,6 @@ export default function Map() {
       }
       return next
     })
-    // Deselect if visible pin was hidden
     if (selectedPin?.category === category) {
       setSelectedPin(null)
     }
@@ -114,7 +111,6 @@ export default function Map() {
 
       <CategoryFilter activeCategories={activeCategories} onToggle={toggleCategory} />
 
-      {/* 現在地ボタン */}
       <button
         onClick={locateUser}
         className="absolute bottom-20 right-4 z-[1000] bg-white rounded-full w-12 h-12 shadow-md flex items-center justify-center text-2xl hover:bg-gray-50 active:bg-gray-100"
@@ -122,6 +118,8 @@ export default function Map() {
       >
         📍
       </button>
+
+      <Attribution />
 
       {selectedPin && (
         <PinDetail pin={selectedPin} onClose={() => setSelectedPin(null)} />
