@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import 'leaflet.markercluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { Pin, PinCategory, CATEGORIES } from '@/lib/types'
 import { DUMMY_PINS } from '@/lib/pins'
 import { savePins, saveLastUpdated } from '@/lib/indexeddb'
@@ -35,6 +38,7 @@ export default function Map() {
   const mapRef = useRef<HTMLDivElement>(null)
   const leafletMap = useRef<L.Map | null>(null)
   const markersRef = useRef<globalThis.Map<string, L.Marker>>(new globalThis.Map())
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const [activeCategories, setActiveCategories] = useState<Set<PinCategory>>(new Set(ALL_CATEGORIES))
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
 
@@ -59,28 +63,39 @@ export default function Map() {
     savePins(DUMMY_PINS)
     saveLastUpdated(new Date().toLocaleDateString('ja-JP'))
 
+    const clusterGroup = L.markerClusterGroup({
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+    })
+
     for (const pin of DUMMY_PINS) {
       const marker = L.marker([pin.lat, pin.lng], { icon: createPinIcon(pin.category) })
       marker.on('click', () => setSelectedPin(pin))
-      marker.addTo(map)
+      clusterGroup.addLayer(marker)
       markersRef.current.set(pin.id, marker)
     }
+
+    clusterGroup.addTo(map)
+    clusterGroupRef.current = clusterGroup
 
     return () => {
       map.remove()
       leafletMap.current = null
+      clusterGroupRef.current = null
     }
   }, [])
 
   useEffect(() => {
-    if (!leafletMap.current) return
+    const clusterGroup = clusterGroupRef.current
+    if (!clusterGroup) return
     for (const pin of DUMMY_PINS) {
       const marker = markersRef.current.get(pin.id)
       if (!marker) continue
       if (activeCategories.has(pin.category)) {
-        marker.addTo(leafletMap.current)
+        clusterGroup.addLayer(marker)
       } else {
-        marker.remove()
+        clusterGroup.removeLayer(marker)
       }
     }
   }, [activeCategories])
