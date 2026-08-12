@@ -109,7 +109,7 @@ def parse_evacuation(rows: list[dict]) -> list[dict]:
         applicable = [k for k in disaster_keys if str(row.get(f"災害種別_{k}") or row.get(k) or "").strip() == "1"]
         notes = "対応: " + "・".join(applicable) if applicable else "緊急避難場所"
         pins.append({
-            "id": f"evac-{i+1}", "category": "shelter",
+            "id": f"evac-{i+1}", "category": "evacuation_site",
             "name": name, "address": address,
             "lat": round(lat, 6), "lng": round(lng, 6),
             "detail": {"capacity": capacity, "notes": notes},

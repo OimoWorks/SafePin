@@ -1,6 +1,6 @@
 'use client'
 
-import { Pin, CATEGORIES, ShelterDetail, ToiletDetail, WaterDetail, AedDetail } from '@/lib/types'
+import { Pin, CATEGORIES, ShelterDetail, EvacuationSiteDetail, ToiletDetail, WaterDetail, AedDetail } from '@/lib/types'
 
 type Props = {
   pin: Pin
@@ -19,6 +19,21 @@ export default function PinDetail({ pin, onClose }: Props) {
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500 text-sm">収容人数</span>
               <span className="font-bold">{d.capacity.toLocaleString()}人</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-gray-500 text-sm">備考</span>
+              <span className="font-medium">{d.notes}</span>
+            </div>
+          </>
+        )
+      }
+      case 'evacuation_site': {
+        const d = pin.detail as EvacuationSiteDetail
+        return (
+          <>
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-gray-500 text-sm">収容人数</span>
+              <span className="font-bold">{d.capacity > 0 ? `${d.capacity.toLocaleString()}人` : '—'}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500 text-sm">備考</span>

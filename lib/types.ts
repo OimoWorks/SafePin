@@ -1,6 +1,11 @@
-export type PinCategory = 'shelter' | 'toilet' | 'water' | 'aed'
+export type PinCategory = 'shelter' | 'evacuation_site' | 'toilet' | 'water' | 'aed'
 
 export type ShelterDetail = {
+  capacity: number
+  notes: string
+}
+
+export type EvacuationSiteDetail = {
   capacity: number
   notes: string
 }
@@ -27,15 +32,20 @@ export type Pin = {
   address: string
   lat: number
   lng: number
-  detail: ShelterDetail | ToiletDetail | WaterDetail | AedDetail
+  detail: ShelterDetail | EvacuationSiteDetail | ToiletDetail | WaterDetail | AedDetail
   updatedAt: string
 }
 
 export const CATEGORIES: Record<PinCategory, { label: string; color: string; icon: string }> = {
   shelter: {
-    label: '避難所',
+    label: '指定避難所',
     color: '#E53E3E',
     icon: '🏠',
+  },
+  evacuation_site: {
+    label: '緊急避難場所',
+    color: '#805AD5',
+    icon: '⛺',
   },
   toilet: {
     label: 'マンホールトイレ',

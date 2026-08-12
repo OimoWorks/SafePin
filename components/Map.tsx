@@ -10,7 +10,7 @@ import CategoryFilter from './CategoryFilter'
 import PinDetail from './PinDetail'
 import Attribution from './Attribution'
 
-const ALL_CATEGORIES = new Set<PinCategory>(['shelter', 'toilet', 'water', 'aed'])
+const ALL_CATEGORIES = new Set<PinCategory>(['shelter', 'evacuation_site', 'toilet', 'water', 'aed'])
 
 function createPinIcon(category: PinCategory) {
   const cat = CATEGORIES[category]
