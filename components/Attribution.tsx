@@ -10,7 +10,7 @@ export default function Attribution() {
       >
         松山市オープンデータ
       </a>
-      を加工して作成（CC BY 4.0）
+      （緊急避難場所・AED・公共施設一覧 等）を加工して作成（CC BY 4.0）
     </div>
   )
 }

@@ -6,6 +6,7 @@ Usage: python3 scripts/build_pins.py
   - evacuation.csv   (緊急避難場所)
   - aed.csv          (AED)
   - school.csv       (学校座標)
+  - public_facility.csv (公共施設一覧)
   - shelter.csv      (指定避難所 - OCR等で変換済みのもの, 任意)
   - manhole.csv      (マンホールトイレ一覧 - 手動整備, 任意)
 出力: lib/pins-data.json
@@ -61,6 +62,31 @@ def geocode_address(address: str) -> tuple[float, float] | None:
             return (float(coord[1]), float(coord[0]))
     except Exception:
         pass
+    return None
+
+
+def build_facility_index(rows: list[dict]) -> dict[str, tuple[float, float]]:
+    index = {}
+    for row in rows:
+        name_raw = (row.get("名称") or "").strip()
+        name_clean = re.sub(r'[（(][^）)]*[）)]', '', name_raw).strip()
+        name = normalize(name_clean)
+        if not name:
+            continue
+        lat = safe_float(row.get("緯度") or "")
+        lng = safe_float(row.get("経度") or "")
+        if lat and lng and abs(lat) > 1 and abs(lng) > 1:
+            index[name] = (lat, lng)
+    return index
+
+
+def lookup_facility(facility_index: dict, name: str) -> tuple[float, float] | None:
+    key = normalize(name)
+    if key in facility_index:
+        return facility_index[key]
+    for k, v in facility_index.items():
+        if key in k or k in key:
+            return v
     return None
 
 
@@ -141,7 +167,7 @@ def parse_aed(rows: list[dict]) -> list[dict]:
     return pins
 
 
-def parse_manhole(rows: list[dict], school_index: dict) -> list[dict]:
+def parse_manhole(rows: list[dict], school_index: dict, facility_index: dict) -> list[dict]:
     toilet_pins, water_pins = [], []
     for i, row in enumerate(rows):
         school_name = (row.get("学校名") or "").strip()
@@ -149,6 +175,8 @@ def parse_manhole(rows: list[dict], school_index: dict) -> list[dict]:
         has_water = str(row.get("応急給水栓") or "").strip() in ("○", "〇", "有", "1", "true")
         year = (row.get("整備年度") or "").strip()
         coords = lookup_school(school_index, school_name)
+        if not coords:
+            coords = lookup_facility(facility_index, school_name)
         if not coords:
             print(f"  [WARN] 座標不明: {school_name}")
             continue
@@ -174,7 +202,7 @@ def parse_manhole(rows: list[dict], school_index: dict) -> list[dict]:
     return toilet_pins + water_pins
 
 
-def parse_shelter_csv(rows: list[dict], school_index: dict) -> list[dict]:
+def parse_shelter_csv(rows: list[dict], school_index: dict, facility_index: dict) -> list[dict]:
     pins = []
     geocode_cache = {}
     for i, row in enumerate(rows):
@@ -188,16 +216,20 @@ def parse_shelter_csv(rows: list[dict], school_index: dict) -> list[dict]:
             coords = lookup_school(school_index, name)
             if coords:
                 lat, lng = coords
-            elif address:
-                if address not in geocode_cache:
-                    print(f"  Geocoding: {name}...", end=" ", flush=True)
-                    result = geocode_address(address)
-                    geocode_cache[address] = result
-                    time.sleep(0.5)
-                    print("OK" if result else "FAIL")
-                coords = geocode_cache.get(address)
-                if coords:
-                    lat, lng = coords
+        if not lat or not lng:
+            coords = lookup_facility(facility_index, name)
+            if coords:
+                lat, lng = coords
+        if not lat or not lng and address:
+            if address not in geocode_cache:
+                print(f"  Geocoding: {name}...", end=" ", flush=True)
+                result = geocode_address(address)
+                geocode_cache[address] = result
+                time.sleep(0.5)
+                print("OK" if result else "FAIL")
+            coords = geocode_cache.get(address)
+            if coords:
+                lat, lng = coords
         if not lat or not lng:
             print(f"  [SKIP] 座標取得できず: {name}")
             continue
@@ -219,6 +251,11 @@ def main():
     school_rows = read_csv("school.csv")
     school_index = build_school_index(school_rows)
     print(f"学校座標: {len(school_index)}件 読み込み")
+
+    facility_rows = read_csv("public_facility.csv")
+    facility_index = build_facility_index(facility_rows)
+    print(f"公共施設座標: {len(facility_index)}件 読み込み")
+
     all_pins = []
 
     evac_rows = read_csv("evacuation.csv")
@@ -231,7 +268,7 @@ def main():
 
     shelter_rows = read_csv("shelter.csv")
     if shelter_rows:
-        shelter_pins = parse_shelter_csv(shelter_rows, school_index)
+        shelter_pins = parse_shelter_csv(shelter_rows, school_index, facility_index)
         all_pins.extend(shelter_pins)
         print(f"指定避難所: {len(shelter_pins)}件")
     else:
@@ -247,7 +284,7 @@ def main():
 
     manhole_rows = read_csv("manhole.csv")
     if manhole_rows:
-        facility_pins = parse_manhole(manhole_rows, school_index)
+        facility_pins = parse_manhole(manhole_rows, school_index, facility_index)
         toilet_count = sum(1 for p in facility_pins if p["category"] == "toilet")
         water_count = sum(1 for p in facility_pins if p["category"] == "water")
         all_pins.extend(facility_pins)

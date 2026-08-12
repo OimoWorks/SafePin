@@ -32,6 +32,12 @@ SOURCES = [
         "filename": "school.csv",
         "desc": "学校施設座標",
     },
+    {
+        "key": "public_facility",
+        "url": "https://www.city.matsuyama.ehime.jp/shisei/opendata/metadata/shisetsu.files/382019_public_facility.csv",
+        "filename": "public_facility.csv",
+        "desc": "公共施設一覧",
+    },
 ]
 
 

@@ -30,7 +30,7 @@ def main():
     def detail_str(p: dict) -> str:
         cat = p["category"]
         d = p["detail"]
-        if cat in ("shelter", "toilet"):
+        if cat in ("shelter", "evacuation_site", "toilet"):
             cap = d.get("capacity", 0)
             notes = d.get("notes", "")
             return f'{{ capacity: {cap}, notes: {json.dumps(notes, ensure_ascii=False)} }}'
