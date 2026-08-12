@@ -53,13 +53,32 @@ def safe_float(v: str) -> float | None:
 
 
 def geocode_address(address: str) -> tuple[float, float] | None:
+    """国土地理院APIで住所→座標変換。
+
+    旧地番（「甲」「乙」等）を含む住所はAPIが番地を解決できず、市区町村レベルの
+    中心座標を返すことがある。返却されたtitleと元クエリを比較し、
+    クエリに含まれる町名・字レベルの文字列がtitleに存在しない場合はNoneを返す。
+    """
     url = "https://msearch.gsi.go.jp/address-search/AddressSearch"
     try:
         r = requests.get(url, params={"q": address}, timeout=10)
         data = r.json()
-        if data:
-            coord = data[0]["geometry"]["coordinates"]
-            return (float(coord[1]), float(coord[0]))
+        if not data:
+            return None
+        feature = data[0]
+        coord = feature["geometry"]["coordinates"]
+        title = normalize(feature.get("properties", {}).get("title", ""))
+        query = normalize(address)
+        # 「松山市○○町」の「○○町」部分（市名以降の最初の地名要素）がtitleに含まれるか確認。
+        # 市名（先頤64文字程度）を除いた残りの先頤64文字をスラック文字列として使う。
+        # 例: query="松山市崎田甲203-1" → after_city="崎田甲203" → これがtitleになければ除外
+        after_city = re.sub(r'^.{2,4}[都道府県].{1,6}[市区町村]', '', query)
+        if after_city and len(after_city) >= 2:
+            check = after_city[:4]
+            if check not in title:
+                print(f"    [geocode SKIP] title={title!r} に {check!r} が含まれず → 過広域マッチと判断")
+                return None
+        return (float(coord[1]), float(coord[0]))
     except Exception:
         pass
     return None
@@ -300,7 +319,7 @@ def main():
         all_pins.extend(aed_pins)
         print(f"AED: {len(aed_pins)}件")
     else:
-        print("[WARN] aed.csv が見つかりまぜん")
+        print("[WARN] aed.csv が見つかりません")
 
     manhole_rows = read_csv("manhole.csv")
     if manhole_rows:
