@@ -80,13 +80,31 @@ def build_facility_index(rows: list[dict]) -> dict[str, tuple[float, float]]:
     return index
 
 
+_FACILITY_VARIANTS: list[tuple[str, str]] = [
+    ("分館", "集会所"),
+    ("集会所", "分館"),
+    ("分校", "小学校"),
+    ("小学校", "分校"),
+    ("出張所", "支所"),
+    ("支所", "出張所"),
+]
+
+
+def _facility_variants(key: str) -> list[str]:
+    variants = []
+    for src, dst in _FACILITY_VARIANTS:
+        if src in key:
+            variants.append(key.replace(src, dst))
+    return variants
+
+
 def lookup_facility(facility_index: dict, name: str) -> tuple[float, float] | None:
     key = normalize(name)
     if key in facility_index:
         return facility_index[key]
-    for k, v in facility_index.items():
-        if key in k or k in key:
-            return v
+    for variant in _facility_variants(key):
+        if variant in facility_index:
+            return facility_index[variant]
     return None
 
 
@@ -112,7 +130,9 @@ def lookup_school(school_index: dict, name: str) -> tuple[float, float] | None:
     if key in school_index:
         return school_index[key]
     for k, v in school_index.items():
-        if key in k or k in key:
+        if key in k and len(key) >= len(k) * 0.7:
+            return v
+        if k in key and len(k) >= len(key) * 0.7:
             return v
     return None
 
@@ -280,7 +300,7 @@ def main():
         all_pins.extend(aed_pins)
         print(f"AED: {len(aed_pins)}件")
     else:
-        print("[WARN] aed.csv が見つかりません")
+        print("[WARN] aed.csv が見つかりまぜん")
 
     manhole_rows = read_csv("manhole.csv")
     if manhole_rows:
