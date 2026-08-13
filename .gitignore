@@ -37,4 +37,5 @@ next-env.d.ts
 
 # SafePin data pipeline
 /scripts/raw/
+!/scripts/raw/shelter_overrides.csv
 /lib/pins-data.json
