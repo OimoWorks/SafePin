@@ -517,11 +517,17 @@ def parse_manhole(rows: list[dict], school_index: dict, facility_index: dict) ->
     toilet_pins, water_pins = [], []
     if rows:
         print(f"  [DEBUG] manhole.csv 列名: {list(rows[0].keys())}")
+    _AREA_PATTERN = re.compile(r'エリア|地区|地域|中心部')
     for i, row in enumerate(rows):
         # 列名ゆれに対応（学校名 / 施設名 / 名称）
         school_name = (
             row.get("学校名") or row.get("施設名") or row.get("名称") or ""
         ).strip()
+        # PDF注記を除去（例: 「〇〇小学校（PDF：543KB）」→「〇〇小学校」）
+        school_name = re.sub(r'[（(]PDF[^）)]*[）)]', '', school_name).strip()
+        # エリア見出し行・空行はスキップ
+        if not school_name or _AREA_PATTERN.search(school_name):
+            continue
         # マンホールトイレ基数（数字以外を除去）
         manhole_raw = row.get("マンホールトイレ基数") or row.get("基数") or "0"
         manhole_count = int(re.sub(r"[^\d]", "", str(manhole_raw)) or 0)
@@ -629,7 +635,7 @@ def main():
         all_pins.extend(aed_pins)
         print(f"AED: {len(aed_pins)}件")
     else:
-        print("[WARN] aed.csv が見つかりません")
+tml ロー        print("[WARN] aed.csv が見つかりません")
 
     manhole_rows = read_csv("manhole.csv")
     if manhole_rows:

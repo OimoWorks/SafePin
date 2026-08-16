@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-松山市 応急給水栓・マンホールトイレ一覧ページをスクレイプして manhole.csv を生成
+松山市 応急給水栓・マンホールトイレ一覧ページをスクレープして manhole.csv を生成
 Usage: python3 scripts/scrape_manhole.py
 """
 
 import csv
 import os
+import re
 import sys
 import requests
 from html.parser import HTMLParser
@@ -77,7 +78,12 @@ def main():
     print(f"ヘッダー: {parser.headers}")
     print(f"行数: {len(parser.rows)}")
 
+    # セル結合された見出し行（エリア名・地区名）を除外するパターン
+    _AREA_PATTERN = re.compile(r'エリア|地区|地域|中心部')
+
     fieldnames = ["学校名", "応急給水栓", "マンホールトイレ基数", "整備年度"]
+    written = 0
+    skipped = 0
 
     with open(OUT, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -85,9 +91,17 @@ def main():
         for row in parser.rows:
             while len(row) < 4:
                 row.append("")
+            # 1列目（施設名）を取得し、PDF注記を除去
+            raw_name = re.sub(r'[（(]PDF[^）)]*[）)]', '', row[0]).strip()
+            # エリア見出し行・空行・地区名のみの行はスキップ
+            if not raw_name or _AREA_PATTERN.search(raw_name):
+                skipped += 1
+                continue
+            row[0] = raw_name
             writer.writerow(row[:4])
+            written += 1
 
-    print(f"\n出力: {OUT}")
+    print(f"\n出力: {OUT}（{written}件、{skipped}行スキップ）")
     print("※ 列の順序が正しいか確認し、必要なら手動で修正してください。")
 
 
