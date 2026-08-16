@@ -69,20 +69,52 @@ def safe_float(v: str) -> float | None:
 
 # ── 座標ソース 0: shelter_overrides.csv（手動修正・最優先） ──────────────────
 
-def build_overrides_index(rows: list[dict]) -> dict[str, tuple[float, float]]:
+def build_overrides_index(
+    rows: list[dict],
+) -> tuple[dict[tuple[str, str], tuple[float, float]], dict[str, tuple[float, float]]]:
     """
-    shelter_overrides.csv の内容をインデックス化する。
+    shelter_overrides.csv の内容を2つのインデックスに変換する。
     列: 施設名, 住所, lat, lng
-    施設名（正規化後）をキーとする。
+
+    戻り値:
+      addr_index: {(正規化施設名, 正規化住所ヒント): (lat, lng)}
+                  「住所」列が非空の行。shelter の住所への部分一致で照合。
+      name_index: {正規化施設名: (lat, lng)}
+                  「住所」列が空の行（名前のみで一意に特定できる施設）。
     """
-    index = {}
+    addr_index: dict[tuple[str, str], tuple[float, float]] = {}
+    name_index: dict[str, tuple[float, float]] = {}
     for row in rows:
         name = normalize((row.get("施設名") or "").strip())
+        addr = normalize((row.get("住所") or "").strip())
         lat = safe_float(row.get("lat") or "")
         lng = safe_float(row.get("lng") or "")
-        if name and lat and lng:
-            index[name] = (lat, lng)
-    return index
+        if not name or not lat or not lng:
+            continue
+        if addr:
+            addr_index[(name, addr)] = (lat, lng)
+        else:
+            name_index[name] = (lat, lng)
+    return addr_index, name_index
+
+
+def lookup_override(
+    addr_index: dict[tuple[str, str], tuple[float, float]],
+    name_index: dict[str, tuple[float, float]],
+    name: str,
+    address: str,
+) -> tuple[float, float] | None:
+    """
+    overrides インデックスから座標を検索する。
+    1. 住所ヒント付き: shelter の住所に addr_hint が含まれていれば一致
+    2. 名前のみ: name_index に名前があれば返す
+    """
+    key_name = normalize(name)
+    key_addr = normalize(address)
+    for (n, a), coords in addr_index.items():
+        if n == key_name and a in key_addr:
+            return coords
+    return name_index.get(key_name)
 
 
 # ── 座標ソース 1-2: 学校・公共施設インデックス ────────────────────────────────
@@ -308,7 +340,8 @@ def geocode_google(address: str, api_key: str) -> tuple[float, float] | None:
 
 def parse_shelter_csv(
     rows: list[dict],
-    overrides_index: dict[str, tuple[float, float]],
+    overrides_addr_index: dict[tuple[str, str], tuple[float, float]],
+    overrides_name_index: dict[str, tuple[float, float]],
     school_index: dict,
     facility_index: dict,
     p20_index: dict,
@@ -319,6 +352,8 @@ def parse_shelter_csv(
 
     座標解決の優先順位:
       0. shelter_overrides.csv（手動修正・最優先）
+         0a. 名前＋住所ヒントで一致（同名施設の区別）
+         0b. 名前のみで一致
       1. CSV自身の緯度経度
       2. 学校名マッチング (lookup_school)
       3. 公共施設一覧マッチング (lookup_facility)
@@ -340,7 +375,7 @@ def parse_shelter_csv(
         source = ''
 
         # ── ステップ 0: overrides ────────────────────────────────────────────
-        coords = overrides_index.get(normalize(name))
+        coords = lookup_override(overrides_addr_index, overrides_name_index, name, address)
         if coords:
             lat, lng = coords
             source = 'overrides'
@@ -472,19 +507,14 @@ def parse_manhole(rows: list[dict], school_index: dict, facility_index: dict) ->
         print(f"  [DEBUG] manhole.csv 列名: {list(rows[0].keys())}")
     _AREA_PATTERN = re.compile(r'エリア|地区|地域|中心部')
     for i, row in enumerate(rows):
-        # 列名ゆれに対応（学校名 / 施設名 / 名称）
         school_name = (
             row.get("学校名") or row.get("施設名") or row.get("名称") or ""
         ).strip()
-        # PDF注記を除去（例: 「〇〇小学校（PDF：543KB）」→「〇〇小学校」）
         school_name = re.sub(r'[（(]PDF[^）)]*[）)]', '', school_name).strip()
-        # エリア見出し行・空行はスキップ
         if not school_name or _AREA_PATTERN.search(school_name):
             continue
-        # マンホールトイレ基数（数字以外を除去）
         manhole_raw = row.get("マンホールトイレ基数") or row.get("基数") or "0"
         manhole_count = int(re.sub(r"[^\d]", "", str(manhole_raw)) or 0)
-        # 応急給水栓（列名ゆれ対応）
         water_raw = str(
             row.get("応急給水栓") or row.get("応急給水") or row.get("給水栓") or ""
         ).strip()
@@ -525,9 +555,11 @@ def main():
 
     # ── インデックス構築 ─────────────────────────────────────────────────────
     overrides_rows = read_csv("shelter_overrides.csv")
-    overrides_index = build_overrides_index(overrides_rows)
-    if overrides_index:
-        print(f"手動修正(overrides): {len(overrides_index)}件 読み込み")
+    overrides_addr_index, overrides_name_index = build_overrides_index(overrides_rows)
+    total_overrides = len(overrides_addr_index) + len(overrides_name_index)
+    if total_overrides:
+        print(f"手動修正(overrides): {total_overrides}件 読み込み"
+              f"（住所付き: {len(overrides_addr_index)}件、名前のみ: {len(overrides_name_index)}件）")
 
     school_rows = read_csv("school.csv")
     school_index = build_school_index(school_rows)
@@ -569,7 +601,8 @@ def main():
     shelter_rows = read_csv("shelter.csv")
     if shelter_rows:
         shelter_pins, skipped = parse_shelter_csv(
-            shelter_rows, overrides_index, school_index, facility_index, p20_index, google_api_key
+            shelter_rows, overrides_addr_index, overrides_name_index,
+            school_index, facility_index, p20_index, google_api_key
         )
         all_pins.extend(shelter_pins)
         all_skipped.extend(skipped)
@@ -600,7 +633,6 @@ def main():
     else:
         print("[SKIP] manhole.csv なし（手動整備が必要）")
 
-    # _src フィールドは内部用なので出力から除去
     for p in all_pins:
         p.pop("_src", None)
 
