@@ -635,7 +635,7 @@ def main():
         all_pins.extend(aed_pins)
         print(f"AED: {len(aed_pins)}件")
     else:
-tml ロー        print("[WARN] aed.csv が見つかりません")
+        print("[WARN] aed.csv が見つかりません")
 
     manhole_rows = read_csv("manhole.csv")
     if manhole_rows:
