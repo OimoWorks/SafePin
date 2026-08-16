@@ -304,37 +304,6 @@ def geocode_google(address: str, api_key: str) -> tuple[float, float] | None:
     return result
 
 
-# ── 座標ソース 5: 国土地理院ジオコーディング（フォールバック） ─────────────────
-
-def geocode_address(address: str) -> tuple[float, float] | None:
-    """
-    国土地理院APIで住所→座標変換。
-    旧地番（甲・乙等）を含む住所はAPIが番地を解決できず市区町村の
-    中心座標を返すことがある。titleと元クエリを比較し、
-    町名レベルの文字列がtitleに含まれない場合はNoneを返す。
-    """
-    url = 'https://msearch.gsi.go.jp/address-search/AddressSearch'
-    try:
-        r = requests.get(url, params={'q': address}, timeout=10)
-        data = r.json()
-        if not data:
-            return None
-        feature = data[0]
-        coord = feature['geometry']['coordinates']
-        title = normalize(feature.get('properties', {}).get('title', ''))
-        query = normalize(address)
-        after_city = re.sub(r'^.{2,4}[都道府県].{1,6}[市区町村]', '', query)
-        if after_city and len(after_city) >= 2:
-            check = after_city[:4]
-            if check not in title:
-                print(f"    [GSI SKIP] title={title!r} に {check!r} なし → 過広域マッチ")
-                return None
-        return (float(coord[1]), float(coord[0]))
-    except Exception:
-        pass
-    return None
-
-
 # ── ピン生成：指定避難所 ─────────────────────────────────────────────────────
 
 def parse_shelter_csv(
@@ -355,12 +324,10 @@ def parse_shelter_csv(
       3. 公共施設一覧マッチング (lookup_facility)
       4. 国土数値情報P20マッチング (lookup_p20)
       5. Google Geocoding API（APIキー設定時のみ）
-      6. 国土地理院ジオコーディング（フォールバック）
-      7. スキップ → skippedリストに追加
+      6. スキップ → skippedリストに追加
     """
     pins: list[dict] = []
     skipped: list[dict] = []
-    gsi_cache: dict[str, tuple[float, float] | None] = {}
 
     for i, row in enumerate(rows):
         name = (row.get("施設名") or "").strip()
@@ -418,21 +385,7 @@ def parse_shelter_csv(
                 else:
                     print("FAIL")
 
-        # ── ステップ 6: 国土地理院ジオコーディング ────────────────────────────
-        if not lat or not lng:
-            if address:
-                if address not in gsi_cache:
-                    print(f"  [GSI] {name}...", end=" ", flush=True)
-                    result = geocode_address(address)
-                    gsi_cache[address] = result
-                    time.sleep(0.5)
-                    print("OK" if result else "FAIL")
-                coords = gsi_cache.get(address)
-                if coords:
-                    lat, lng = coords
-                    source = 'gsi'
-
-        # ── ステップ 7: スキップ ──────────────────────────────────────────────
+        # ── ステップ 6: スキップ ──────────────────────────────────────────────
         if not lat or not lng:
             print(f"  [SKIP] {name} | {address}")
             skipped.append({"name": name, "address": address})
