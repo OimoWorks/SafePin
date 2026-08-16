@@ -117,7 +117,7 @@ def lookup_school(school_index: dict, name: str) -> tuple[float, float] | None:
 
 
 def build_facility_index(rows: list[dict]) -> dict[str, tuple[float, float]]:
-    index = {}  
+    index = {}
     for row in rows:
         name_raw = (row.get("名称") or "").strip()
         name_clean = re.sub(r'[（(][^）)]*[）)]', '', name_raw).strip()
@@ -335,16 +335,6 @@ def geocode_address(address: str) -> tuple[float, float] | None:
     return None
 
 
-# ── 指定避難所 OCR誤読修正テーブル ──────────────────────────────────────
-# shelter.csv の OCR 書き起こし誤りを build_pins.py 内で自動修正する。
-# キー: CSV内の誤った施設名, 値: (正しい施設名, 正しい住所)
-_SHELTER_CORRECTIONS: dict[str, tuple[str, str]] = {
-    "粗井公民館籪分館": ("粘井公民館麓分館", "松山市麓甲407-4"),
-    "立岩公民館坊田分館": ("立岩公民館坊田分館", "松山市小山田甲203-1"),
-    "中島公民館鏡分館": ("中島公民館饒分館", "松山市饒甲422-2"),
-}
-
-
 # ── ピン生成：指定避難所 ─────────────────────────────────────────────────────
 
 def parse_shelter_csv(
@@ -381,13 +371,6 @@ def parse_shelter_csv(
         lat: float | None = None
         lng: float | None = None
         source = ''
-
-        # ── OCR誤読修正（_SHELTER_CORRECTIONS テーブル）────────────────────
-        if name in _SHELTER_CORRECTIONS:
-            corrected_name, corrected_addr = _SHELTER_CORRECTIONS[name]
-            print(f"  [CORRECT] {name!r} → {corrected_name!r} / {corrected_addr!r}")
-            name = corrected_name
-            address = corrected_addr
 
         # ── ステップ 0: overrides ────────────────────────────────────────────
         coords = overrides_index.get(normalize(name))
@@ -507,7 +490,7 @@ def parse_evacuation(rows: list[dict]) -> list[dict]:
 
 def parse_aed(rows: list[dict]) -> list[dict]:
     pins = []
-    for i, row in enumerate(rows):  
+    for i, row in enumerate(rows):
         lat = safe_float(row.get("緯度") or row.get("Y") or "")
         lng = safe_float(row.get("経度") or row.get("X") or "")
         if not lat or not lng:
