@@ -9,7 +9,7 @@ Usage: python3 scripts/build_pins.py
   - aed.csv              (AED)
   - school.csv           (学校座標)
   - public_facility.csv  (公共施設一覧)
-  任意（あると座標解決率が上がる）:
+  任意（あると座標解決率が上がる）
   - shelter.csv          (指定避難所 - OCR等で変換済みのもの)
   - manhole.csv          (マンホールトイレ一覧 - 手動整備)
   - P20-12_38.xml        (国土数値情報「避難施設」愛媛県版)
@@ -41,7 +41,7 @@ RAW_DIR = os.path.join(SCRIPT_DIR, "raw")
 OUT_PATH = os.path.join(SCRIPT_DIR, "..", "lib", "pins-data.json")
 
 
-# ── ユーティリティ ────────────────────────────────────────────────────────────
+# ── ユーティリティ ────────────────────────────────────────────
 
 def read_csv(filename: str) -> list[dict]:
     path = os.path.join(RAW_DIR, filename)
@@ -67,34 +67,36 @@ def safe_float(v: str) -> float | None:
         return None
 
 
-# ── 座標ソース 0: shelter_overrides.csv（手動修正・最優先） ──────────────────
+# ── 座標ソース 0: shelter_overrides.csv（手動修正・最優先） ──────────────
 
 def build_overrides_index(
     rows: list[dict],
 ) -> tuple[dict[tuple[str, str], tuple[float, float]], dict[str, tuple[float, float]]]:
     """
     shelter_overrides.csv の内容を2つのインデックスに変換する。
-    列: 施設名, 住所, lat, lng
+    列名の揺れに対応: 施設名/名称、lat/緯度、lng/経度
 
     戻り値:
       addr_index: {(正規化施設名, 正規化住所ヒント): (lat, lng)}
                   「住所」列が非空の行。shelter の住所への部分一致で照合。
       name_index: {正規化施設名: (lat, lng)}
-                  「住所」列が空の行（名前のみで一意に特定できる施設）。
+                  全エントリを登録（同名施設のアドレスマッチが失敗した際のフォールバック）。
     """
     addr_index: dict[tuple[str, str], tuple[float, float]] = {}
     name_index: dict[str, tuple[float, float]] = {}
     for row in rows:
-        name = normalize((row.get("施設名") or "").strip())
+        # 列名の揺れに対応: 施設名/名称、lat/緯度、lng/経度
+        name = normalize((row.get("施設名") or row.get("名称") or "").strip())
         addr = normalize((row.get("住所") or "").strip())
-        lat = safe_float(row.get("lat") or "")
-        lng = safe_float(row.get("lng") or "")
+        lat = safe_float(row.get("lat") or row.get("緯度") or "")
+        lng = safe_float(row.get("lng") or row.get("経度") or "")
         if not name or not lat or not lng:
             continue
+        # 全エントリを name_index に登録（名前だけで一意に特定できる65件のフォールバック）
+        name_index[name] = (lat, lng)
         if addr:
+            # 住所付きエントリは addr_index にも登録（同名施設の住所による区別）
             addr_index[(name, addr)] = (lat, lng)
-        else:
-            name_index[name] = (lat, lng)
     return addr_index, name_index
 
 
@@ -106,18 +108,19 @@ def lookup_override(
 ) -> tuple[float, float] | None:
     """
     overrides インデックスから座標を検索する。
-    1. 住所ヒント付き: shelter の住所に addr_hint が含まれていれば一致
+    1. 住所ヒント付き: 部分一致（双方向）で同名施設を区別
     2. 名前のみ: name_index に名前があれば返す
     """
     key_name = normalize(name)
     key_addr = normalize(address)
     for (n, a), coords in addr_index.items():
-        if n == key_name and a in key_addr:
+        # 双方向部分一致: override住所が長くても短くても対応
+        if n == key_name and (a in key_addr or key_addr in a):
             return coords
     return name_index.get(key_name)
 
 
-# ── 座標ソース 1-2: 学校・公共施設インデックス ────────────────────────────────
+# ── 座標ソース 1-2: 学校・公共施設インデックス ────────────────────────
 
 def build_school_index(rows: list[dict]) -> dict[str, tuple[float, float]]:
     index = {}
@@ -191,7 +194,7 @@ def lookup_facility(facility_index: dict, name: str) -> tuple[float, float] | No
     return None
 
 
-# ── 座標ソース 3: 国土数値情報 P20「避難施設」XML ────────────────────────────
+# ── 座標ソース 3: 国土数値情報 P20「避難施設」 XML ─────────────────
 
 _P20_NS = {
     'gml':   'http://www.opengis.net/gml/3.2',
@@ -273,7 +276,7 @@ def build_p20_index(features: list[dict]) -> dict[str, tuple[float, float]]:
 
 def lookup_p20(p20_index: dict, name: str) -> tuple[float, float] | None:
     """
-    P20インデックスで完全一致→部分一致（長さ70%ガード付き）の順で検索。
+    P20インデックスで完全一致→部分一致（長さ 70%ガード付き）の順で検索。
     """
     key = normalize(name)
     if key in p20_index:
@@ -289,7 +292,7 @@ def lookup_p20(p20_index: dict, name: str) -> tuple[float, float] | None:
     return None
 
 
-# ── 座標ソース 4: Google Geocoding API ────────────────────────────────────────
+# ── 座標ソース 4: Google Geocoding API ────────────────────────────────
 
 _GOOGLE_ACCEPTED_TYPES = {'street_address', 'premise', 'subpremise'}
 _GOOGLE_ACCEPTED_LOCATION_TYPES = {'ROOFTOP', 'RANGE_INTERPOLATED'}
@@ -336,7 +339,7 @@ def geocode_google(address: str, api_key: str) -> tuple[float, float] | None:
     return result
 
 
-# ── ピン生成：指定避難所 ─────────────────────────────────────────────────────
+# ── ピン生成：指定避難所 ─────────────────────────────────────────────
 
 def parse_shelter_csv(
     rows: list[dict],
@@ -374,41 +377,41 @@ def parse_shelter_csv(
         lng: float | None = None
         source = ''
 
-        # ── ステップ 0: overrides ────────────────────────────────────────────
+        # ── ステップ 0: overrides ───────────────────────────────────────
         coords = lookup_override(overrides_addr_index, overrides_name_index, name, address)
         if coords:
             lat, lng = coords
             source = 'overrides'
 
-        # ── ステップ 1: CSV自身の座標 ─────────────────────────────────────────
+        # ── ステップ 1: CSV自身の座標 ─────────────────────────────────
         if not lat or not lng:
             lat = safe_float(row.get("緯度") or row.get("Y") or "")
             lng = safe_float(row.get("経度") or row.get("X") or "")
             if lat and lng:
                 source = 'csv'
 
-        # ── ステップ 2: 学校名マッチング ──────────────────────────────────────
+        # ── ステップ 2: 学校名マッチング ──────────────────────────────
         if not lat or not lng:
             coords = lookup_school(school_index, name)
             if coords:
                 lat, lng = coords
                 source = 'school'
 
-        # ── ステップ 3: 公共施設一覧マッチング ───────────────────────────────
+        # ── ステップ 3: 公共施設一覧マッチング ───────────────────────
         if not lat or not lng:
             coords = lookup_facility(facility_index, name)
             if coords:
                 lat, lng = coords
                 source = 'facility'
 
-        # ── ステップ 4: 国土数値情報P20マッチング ────────────────────────────
+        # ── ステップ 4: 国土数値情報P20マッチング ─────────────────────
         if not lat or not lng:
             coords = lookup_p20(p20_index, name)
             if coords:
                 lat, lng = coords
                 source = 'p20'
 
-        # ── ステップ 5: Google Geocoding ──────────────────────────────────────
+        # ── ステップ 5: Google Geocoding ───────────────────────────────
         if not lat or not lng:
             if google_api_key and address:
                 print(f"  [Google] {name}...", end=" ", flush=True)
@@ -420,7 +423,7 @@ def parse_shelter_csv(
                 else:
                     print("FAIL")
 
-        # ── ステップ 6: スキップ ──────────────────────────────────────────────
+        # ── ステップ 6: スキップ ───────────────────────────────────────────
         if not lat or not lng:
             print(f"  [SKIP] {name} | {address}")
             skipped.append({"name": name, "address": address})
@@ -445,7 +448,7 @@ def parse_shelter_csv(
     return pins, skipped
 
 
-# ── ピン生成：緊急避難場所 ─────────────────────────────────────────────────────
+# ── ピン生成：緊急避難場所 ─────────────────────────────────────────────
 
 def parse_evacuation(rows: list[dict]) -> list[dict]:
     pins = []
@@ -461,7 +464,7 @@ def parse_evacuation(rows: list[dict]) -> list[dict]:
             capacity = int(re.sub(r"[^\d]", "", capacity_raw)) if capacity_raw.strip() else 0
         except ValueError:
             capacity = 0
-        disaster_keys = ["洪水", "崖崩れ", "高潮", "地震", "津波", "大規模な火事", "内水氾濫", "火山現象"]
+        disaster_keys = ["洪水", "崖崩れ", "高潮", "地震", "津波", "大規模な火事", "内水汎濫", "火山現象"]
         applicable = [k for k in disaster_keys if str(row.get(f"災害種別_{k}") or row.get(k) or "").strip() == "1"]
         notes = "対応: " + "・".join(applicable) if applicable else "緊急避難場所"
         pins.append({
@@ -474,7 +477,7 @@ def parse_evacuation(rows: list[dict]) -> list[dict]:
     return pins
 
 
-# ── ピン生成：AED ──────────────────────────────────────────────────────────────
+# ── ピン生成：AED ──────────────────────────────────────────────────────
 
 def parse_aed(rows: list[dict]) -> list[dict]:
     pins = []
@@ -499,7 +502,7 @@ def parse_aed(rows: list[dict]) -> list[dict]:
     return pins
 
 
-# ── ピン生成：マンホールトイレ・応急給水栓 ─────────────────────────────────────
+# ── ピン生成：マンホールトイレ・応急給水栓 ─────────────────────────────
 
 def parse_manhole(rows: list[dict], school_index: dict, facility_index: dict) -> list[dict]:
     toilet_pins, water_pins = [], []
@@ -548,12 +551,12 @@ def parse_manhole(rows: list[dict], school_index: dict, facility_index: dict) ->
     return toilet_pins + water_pins
 
 
-# ── メイン ────────────────────────────────────────────────────────────────────
+# ── メイン ────────────────────────────────────────────────────────────────────────────────
 
 def main():
     print("=== SafePin ピンデータ生成 ===\n")
 
-    # ── インデックス構築 ─────────────────────────────────────────────────────
+    # ── インデックス構築 ──────────────────────────────────────────────────
     overrides_rows = read_csv("shelter_overrides.csv")
     overrides_addr_index, overrides_name_index = build_overrides_index(overrides_rows)
     total_overrides = len(overrides_addr_index) + len(overrides_name_index)
@@ -586,7 +589,7 @@ def main():
 
     print()
 
-    # ── ピン生成 ─────────────────────────────────────────────────────────────
+    # ── ピン生成 ─────────────────────────────────────────────────────
     all_pins: list[dict] = []
     all_skipped: list[dict] = []
 
