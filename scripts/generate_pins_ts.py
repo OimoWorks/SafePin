@@ -8,6 +8,7 @@ Usage: python3 scripts/generate_pins_ts.py
 
 import json
 import os
+from collections import Counter
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIB_DIR = os.path.join(SCRIPT_DIR, "..", "lib")
@@ -74,6 +75,9 @@ def main():
         f.write(content)
 
     print(f"生成完了: {TS_PATH} ({len(pins)}件)")
+    cats = Counter(p["category"] for p in pins)
+    for cat, cnt in sorted(cats.items()):
+        print(f"  {cat}: {cnt}件")
 
 
 if __name__ == "__main__":
