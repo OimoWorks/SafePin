@@ -27,6 +27,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RAW_DIR = os.path.join(SCRIPT_DIR, "raw")
 OUT = os.path.join(RAW_DIR, "shelter_overrides.csv")
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+}
+
+COORDS_RE = re.compile(r'緯度経度[：:]\s*([\d.]+)[,、\s]+([\d.]+)')
+
 
 def parse_display_name(raw: str) -> tuple[str, str]:
     """
@@ -64,20 +76,26 @@ def parse_display_name(raw: str) -> tuple[str, str]:
 
 
 def fetch_coords(url: str, session: requests.Session) -> tuple[float, float] | None:
-    """bosai-map.com の詳細ページから緯度経度を取得する。"""
-    try:
-        r = session.get(
-            url,
-            timeout=15,
-            headers={"User-Agent": "SafePin/1.0 (disaster-preparedness PWA; contact: github.com/oimoworks/safepin)"},
-        )
-        r.raise_for_status()
-        m = re.search(r'緯度経度[：:]\ *([\ d.]+)[,、\ ]+([\ d.]+)', r.text)
-        if m:
-            return float(m.group(1)), float(m.group(2))
-        print(f"  [WARN] 緯度経度テキストが見つかりません: {url}")
-    except Exception as e:
-        print(f"  [ERR] {url}: {e}")
+    """bosai-map.com の詳細ページから緯度経度を取得する。429 は1回だけ10秒待ってリトライ。"""
+    for attempt in range(2):
+        try:
+            r = session.get(url, timeout=15, headers=HEADERS)
+            if r.status_code == 429:
+                if attempt == 0:
+                    print("  [429] 10秒待ってリトライ...", end=" ", flush=True)
+                    time.sleep(10)
+                    continue
+                print(f"  [ERR] 429 Too Many Requests: {url}")
+                return None
+            r.raise_for_status()
+            m = COORDS_RE.search(r.text)
+            if m:
+                return float(m.group(1)), float(m.group(2))
+            print(f"  [WARN] 緯度経度テキストが見つかりません: {url}")
+            return None
+        except Exception as e:
+            print(f"  [ERR] {url}: {e}")
+            return None
     return None
 
 
@@ -115,7 +133,7 @@ def main() -> None:
         else:
             failed.append(name)
             print("FAIL")
-        time.sleep(0.5)
+        time.sleep(2.5)
 
     os.makedirs(RAW_DIR, exist_ok=True)
     with open(OUT, "w", newline="", encoding="utf-8") as f:
