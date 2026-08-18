@@ -7,7 +7,7 @@ import { Pin } from './types'
 //   3. python3 scripts/generate_pins_ts.py
 // で lib/pins.ts を自動上書きしてください。
 
-export const DUMMY_PINS = [
+export const DUMMY_PINS: Pin[] = [
   {
     id: 'shelter-1',
     category: 'shelter',
@@ -17,7 +17,7 @@ export const DUMMY_PINS = [
     lng: 132.7657,
     detail: { capacity: 500, notes: '体育館あり・指定避難所' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'shelter-2',
     category: 'shelter',
@@ -27,7 +27,7 @@ export const DUMMY_PINS = [
     lng: 132.7701,
     detail: { capacity: 300, notes: '校庭も使用可・指定避難所' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'evac-1',
     category: 'evacuation_site',
@@ -37,7 +37,7 @@ export const DUMMY_PINS = [
     lng: 132.7659,
     detail: { capacity: 0, notes: '対応: 地震・大規模な火事' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'evac-2',
     category: 'evacuation_site',
@@ -47,7 +47,7 @@ export const DUMMY_PINS = [
     lng: 132.7689,
     detail: { capacity: 0, notes: '対応: 地震・洪水' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'toilet-1',
     category: 'toilet',
@@ -57,7 +57,7 @@ export const DUMMY_PINS = [
     lng: 132.766,
     detail: { capacity: 20, notes: '災害時開放' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'water-1',
     category: 'water',
@@ -67,7 +67,7 @@ export const DUMMY_PINS = [
     lng: 132.7712,
     detail: { supplyAmount: '1日2000L', notes: '災害時開放' },
     updatedAt: '2026-06-01',
-  },
+  } as Pin,
   {
     id: 'aed-1',
     category: 'aed',
@@ -77,5 +77,5 @@ export const DUMMY_PINS = [
     lng: 132.7713,
     detail: { facilityName: '松山市役所', notes: '1階エントランス' },
     updatedAt: '2026-06-01',
-  },
-] as unknown as Pin[]
+  } as Pin,
+]
