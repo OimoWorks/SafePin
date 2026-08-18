@@ -52,7 +52,7 @@ def main():
         f"// 生成日: {generated_at}",
         "// このファイルは scripts/generate_pins_ts.py で自動生成されます。直接編集しないでください。",
         "",
-        "export const DUMMY_PINS: Pin[] = [",
+        "export const DUMMY_PINS = [",
     ]
 
     for p in pins:
@@ -67,7 +67,7 @@ def main():
         lines.append(f"    updatedAt: {json.dumps(p['updatedAt'])},")
         lines.append("  },")
 
-    lines.append("]")
+    lines.append("] as unknown as Pin[]")
     lines.append("")
 
     content = "\n".join(lines)

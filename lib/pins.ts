@@ -7,7 +7,7 @@ import { Pin } from './types'
 //   3. python3 scripts/generate_pins_ts.py
 // で lib/pins.ts を自動上書きしてください。
 
-const FALLBACK_PINS: Pin[] = [
+export const DUMMY_PINS = [
   {
     id: 'shelter-1',
     category: 'shelter',
@@ -78,6 +78,4 @@ const FALLBACK_PINS: Pin[] = [
     detail: { facilityName: '松山市役所', notes: '1階エントランス' },
     updatedAt: '2026-06-01',
   },
-]
-
-export const DUMMY_PINS: Pin[] = FALLBACK_PINS
+] as unknown as Pin[]
