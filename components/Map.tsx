@@ -8,7 +8,6 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { Pin, PinCategory, CATEGORIES } from '@/lib/types'
 import { DUMMY_PINS } from '@/lib/pins'
-import { savePins, saveLastUpdated } from '@/lib/indexeddb'
 import CategoryFilter from './CategoryFilter'
 import PinDetail from './PinDetail'
 import Attribution from './Attribution'
@@ -60,8 +59,7 @@ export default function Map() {
 
     leafletMap.current = map
 
-    savePins(DUMMY_PINS)
-    saveLastUpdated(new Date().toLocaleDateString('ja-JP'))
+    localStorage.setItem('lastUpdated', new Date().toLocaleDateString('ja-JP'))
 
     const clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 60,

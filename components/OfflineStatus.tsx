@@ -1,22 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLastUpdated } from '@/lib/indexeddb'
-
 export default function OfflineStatus() {
   const [isOffline, setIsOffline] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   useEffect(() => {
     setIsOffline(!navigator.onLine)
+    setLastUpdated(localStorage.getItem('lastUpdated'))
 
     const handleOffline = () => setIsOffline(true)
     const handleOnline = () => setIsOffline(false)
 
     window.addEventListener('offline', handleOffline)
     window.addEventListener('online', handleOnline)
-
-    getLastUpdated().then(setLastUpdated)
 
     return () => {
       window.removeEventListener('offline', handleOffline)

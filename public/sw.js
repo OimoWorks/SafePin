@@ -1,6 +1,5 @@
 const TILE_CACHE = 'map-tiles-v1'
-const DATA_CACHE = 'pin-data-v1'
-const STATIC_CACHE = 'static-v1'
+const APP_CACHE = 'app-shell-v1'
 
 // Matsuyama area tile bounds
 // zoom 12-14, lat 33.7-34.0, lng 132.6-132.9
@@ -62,11 +61,32 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim())
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((k) => k !== TILE_CACHE && k !== APP_CACHE)
+          .map((k) => caches.delete(k))
+      )
+    ).then(() => clients.claim())
+  )
 })
 
 function isTileRequest(request) {
   return request.url.includes('tile.openstreetmap.org')
+}
+
+function isNextStatic(request) {
+  return new URL(request.url).pathname.startsWith('/_next/static/')
+}
+
+function isAppShell(request) {
+  const url = new URL(request.url)
+  return (
+    request.mode === 'navigate' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname.startsWith('/icons/')
+  )
 }
 
 async function cacheFirst(request, cacheName) {
@@ -90,15 +110,16 @@ async function networkFirst(request, cacheName) {
     return res
   } catch (_) {
     const cached = await cache.match(request)
-    return cached || new Response(JSON.stringify({ error: 'offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return cached || new Response('', { status: 503 })
   }
 }
 
 self.addEventListener('fetch', (event) => {
   if (isTileRequest(event.request)) {
     event.respondWith(cacheFirst(event.request, TILE_CACHE))
+  } else if (isNextStatic(event.request)) {
+    event.respondWith(cacheFirst(event.request, APP_CACHE))
+  } else if (isAppShell(event.request)) {
+    event.respondWith(networkFirst(event.request, APP_CACHE))
   }
 })
