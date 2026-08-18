@@ -57,18 +57,22 @@ async function precacheMatsuyamaTiles() {
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
-  event.waitUntil(precacheMatsuyamaTiles())
+  event.waitUntil(precacheMatsuyamaTiles().catch(() => {}))
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== TILE_CACHE && k !== APP_CACHE)
-          .map((k) => caches.delete(k))
-      )
-    ).then(() => clients.claim())
+    (async () => {
+      try {
+        const keys = await caches.keys()
+        await Promise.all(
+          keys
+            .filter((k) => k !== TILE_CACHE && k !== APP_CACHE)
+            .map((k) => caches.delete(k))
+        )
+      } catch (_) {}
+      await clients.claim()
+    })()
   )
 })
 
