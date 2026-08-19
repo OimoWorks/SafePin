@@ -1,13 +1,14 @@
 {
-  "name": "防災マップ",
-  "short_name": "防災マップ",
+  "name": "SafePin",
+  "short_name": "SafePin",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#E53E3E",
-  "description": "オフラインでも使える地域防災インフラマップ",
+  "description": "SafePin - 松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる防災マップアプリ",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
