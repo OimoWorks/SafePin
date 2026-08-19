@@ -26,11 +26,11 @@ export default function RootLayout({
         <meta property="og:title" content="SafePin - 松山市防災マップ" />
         <meta property="og:description" content="松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる非公式の個人開発防災マップアプリ" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="/ogp.png" />
+        <meta property="og:image" content="https://safe-pin-one.vercel.app/ogp.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="SafePin - 松山市防災マップ" />
         <meta name="twitter:description" content="松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる非公式の個人開発防災マップアプリ" />
-        <meta name="twitter:image" content="/ogp.png" />
+        <meta name="twitter:image" content="https://safe-pin-one.vercel.app/ogp.png" />
       </head>
       <body className="antialiased">
         <ServiceWorkerRegister />
