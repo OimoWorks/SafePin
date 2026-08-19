@@ -24,10 +24,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="SafePin" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta property="og:title" content="SafePin - 松山市防災マップ" />
-        <meta property="og:description" content="松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる防災マップアプリ" />
+        <meta property="og:description" content="松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる非公式の個人開発防災マップアプリ" />
         <meta property="og:type" content="website" />
-        {/* TODO: OGP画像（1200x630推奨）を用意後、下記URLを差し替えてください */}
-        <meta property="og:image" content="/icons/icon-512.png" />
+        <meta property="og:image" content="/ogp.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="SafePin - 松山市防災マップ" />
+        <meta name="twitter:description" content="松山市内の避難所・AED・マンホールトイレ・給水拠点をオフラインでも確認できる非公式の個人開発防災マップアプリ" />
+        <meta name="twitter:image" content="/ogp.png" />
       </head>
       <body className="antialiased">
         <ServiceWorkerRegister />
