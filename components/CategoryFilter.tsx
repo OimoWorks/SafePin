@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { PinCategory, CATEGORIES } from '@/lib/types'
+import { trackEvent } from '@/lib/analytics'
 
 type Props = {
   activeCategories: Set<PinCategory>
@@ -59,7 +60,11 @@ export default function CategoryFilter({ activeCategories, onToggle }: Props) {
           return (
             <button
               key={key}
-              onClick={() => onToggle(key)}
+              onClick={() => {
+                const next = !isActive
+                trackEvent('category_filter_toggle', { category: key, action: next ? 'on' : 'off' })
+                onToggle(key)
+              }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-md text-sm font-bold transition-all"
               style={{
                 backgroundColor: isActive ? cat.color : '#e5e7eb',

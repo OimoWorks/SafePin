@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+
+const GA_ID = "G-N02GWKB479";
 
 export const metadata: Metadata = {
   title: "SafePin",
@@ -33,6 +36,18 @@ export default function RootLayout({
         <meta name="twitter:image" content="https://safe-pin-one.vercel.app/ogp.png" />
       </head>
       <body className="antialiased">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_ID}');
+          `}
+        </Script>
         <ServiceWorkerRegister />
         {children}
       </body>

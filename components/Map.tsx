@@ -8,6 +8,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { Pin, PinCategory, CATEGORIES } from '@/lib/types'
 import { DUMMY_PINS } from '@/lib/pins'
+import { trackEvent } from '@/lib/analytics'
 import CategoryFilter from './CategoryFilter'
 import PinDetail from './PinDetail'
 import Attribution from './Attribution'
@@ -73,7 +74,10 @@ export default function Map() {
 
     for (const pin of DUMMY_PINS) {
       const marker = L.marker([pin.lat, pin.lng], { icon: createPinIcon(pin.category) })
-      marker.on('click', () => setSelectedPin(pin))
+      marker.on('click', () => {
+        setSelectedPin(pin)
+        trackEvent('pin_detail_view', { category: pin.category })
+      })
       clusterGroup.addLayer(marker)
       markersRef.current.set(pin.id, marker)
     }
@@ -87,9 +91,12 @@ export default function Map() {
         (pos) => {
           map.setView([pos.coords.latitude, pos.coords.longitude], LOCATE_ZOOM)
           setLocating(false)
+          trackEvent('auto_geolocation_result', { result: 'success' })
         },
-        () => {
+        (err) => {
           setLocating(false)
+          const result = err.code === err.TIMEOUT ? 'timeout' : 'denied'
+          trackEvent('auto_geolocation_result', { result })
         },
         { timeout: 5000, maximumAge: 60000 }
       )
@@ -136,6 +143,7 @@ export default function Map() {
   function locateUser() {
     if (!leafletMap.current) return
     leafletMap.current.locate({ setView: true, maxZoom: LOCATE_ZOOM })
+    trackEvent('locate_button_click')
   }
 
   return (
