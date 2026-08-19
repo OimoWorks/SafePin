@@ -143,13 +143,13 @@ export default function Map() {
       <div ref={mapRef} className="w-full h-full" />
 
       {locating && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center pointer-events-none">
-          <div className="bg-white/80 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-md text-sm text-gray-600">
-            <svg className="animate-spin w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none">
+        <div className="absolute inset-0 z-[2000] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl px-8 py-6 flex flex-col items-center gap-4 shadow-lg">
+            <svg className="animate-spin w-10 h-10 text-red-500" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            現在地を取得中…
+            <p className="text-sm font-medium text-gray-700">現在地を取得しています…</p>
           </div>
         </div>
       )}
