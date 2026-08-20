@@ -198,6 +198,10 @@ export default function Map() {
       userMarkerRef.current
         ? userMarkerRef.current.setLatLng(e.latlng)
         : (userMarkerRef.current = L.marker(e.latlng, { icon: createUserIcon(), zIndexOffset: 400 }).addTo(map))
+      setLocating(false)
+    })
+    map.on('locationerror', () => {
+      setLocating(false)
     })
 
     // 自宅登録 → 現在地 → 固定座標の優先順位で初期表示
@@ -276,7 +280,8 @@ export default function Map() {
   }
 
   function locateUser() {
-    if (!leafletMap.current) return
+    if (!leafletMap.current || locating) return
+    setLocating(true)
     leafletMap.current.locate({ setView: true, maxZoom: LOCATE_ZOOM })
     trackEvent('locate_button_click')
   }
@@ -386,7 +391,8 @@ export default function Map() {
       {/* 現在地ボタン */}
       <button
         onClick={locateUser}
-        className="absolute bottom-20 right-4 z-[1000] bg-white rounded-full w-12 h-12 shadow-md flex items-center justify-center text-2xl hover:bg-gray-50 active:bg-gray-100"
+        disabled={locating}
+        className="absolute bottom-20 right-4 z-[1000] bg-white rounded-full w-12 h-12 shadow-md flex items-center justify-center text-2xl hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="現在地"
       >
         📍
