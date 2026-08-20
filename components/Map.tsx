@@ -73,12 +73,28 @@ function createPreviewIcon() {
 }
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=jp`
-  const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } })
-  if (!res.ok) return null
-  const data = await res.json()
-  if (!data.length) return null
-  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), displayName: data[0].display_name }
+  // 1st: Nominatim（APIキー不要）
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=jp`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.length) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), displayName: data[0].display_name }
+      }
+    }
+  } catch { /* fall through */ }
+
+  // 2nd: Google Geocoding API（サーバー経由でAPIキーを隠蔽）
+  try {
+    const res = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.result) return data.result
+    }
+  } catch { /* fall through */ }
+
+  return null
 }
 
 type HomeModalStage = 'menu' | 'input' | 'confirm'
