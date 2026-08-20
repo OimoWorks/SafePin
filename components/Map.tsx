@@ -55,6 +55,21 @@ function createHomeIcon() {
   })
 }
 
+function createUserIcon() {
+  return L.divIcon({
+    html: `<div style="
+      width:20px;height:20px;
+      border-radius:50%;
+      background:#2563EB;
+      border:3px solid white;
+      box-shadow:0 0 0 4px rgba(37,99,235,0.3);
+    "></div>`,
+    className: '',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  })
+}
+
 function createPreviewIcon() {
   return L.divIcon({
     html: `<div style="
@@ -106,6 +121,7 @@ export default function Map() {
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const homeMarkerRef = useRef<L.Marker | null>(null)
   const previewMarkerRef = useRef<L.Marker | null>(null)
+  const userMarkerRef = useRef<L.Marker | null>(null)
 
   const [activeCategories, setActiveCategories] = useState<Set<PinCategory>>(new Set(ALL_CATEGORIES))
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
@@ -177,6 +193,13 @@ export default function Map() {
     clusterGroup.addTo(map)
     clusterGroupRef.current = clusterGroup
 
+    // 現在地ボタン（locate）の結果で現在地マーカーを更新
+    map.on('locationfound', (e) => {
+      userMarkerRef.current
+        ? userMarkerRef.current.setLatLng(e.latlng)
+        : (userMarkerRef.current = L.marker(e.latlng, { icon: createUserIcon(), zIndexOffset: 400 }).addTo(map))
+    })
+
     // 自宅登録 → 現在地 → 固定座標の優先順位で初期表示
     const saved = getHome()
     if (saved) {
@@ -184,10 +207,27 @@ export default function Map() {
       map.setView([saved.lat, saved.lng], LOCATE_ZOOM)
       homeMarkerRef.current = L.marker([saved.lat, saved.lng], { icon: createHomeIcon(), zIndexOffset: 500 }).addTo(map)
       setLocating(false)
+      // 自宅表示の場合でもバックグラウンドで現在地マーカーを取得しておく
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            userMarkerRef.current = L.marker(
+              [pos.coords.latitude, pos.coords.longitude],
+              { icon: createUserIcon(), zIndexOffset: 400 }
+            ).addTo(map)
+          },
+          () => {},
+          { timeout: 10000, maximumAge: 60000 }
+        )
+      }
     } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           map.setView([pos.coords.latitude, pos.coords.longitude], LOCATE_ZOOM)
+          userMarkerRef.current = L.marker(
+            [pos.coords.latitude, pos.coords.longitude],
+            { icon: createUserIcon(), zIndexOffset: 400 }
+          ).addTo(map)
           setLocating(false)
           trackEvent('auto_geolocation_result', { result: 'success' })
         },
@@ -207,6 +247,7 @@ export default function Map() {
       clusterGroupRef.current = null
       homeMarkerRef.current = null
       previewMarkerRef.current = null
+      userMarkerRef.current = null
     }
   }, [])
 
