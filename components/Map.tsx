@@ -9,6 +9,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { Pin, PinCategory, CATEGORIES } from '@/lib/types'
 import { DUMMY_PINS } from '@/lib/pins'
 import { trackEvent } from '@/lib/analytics'
+import { getHome, setHome, deleteHome, HomeLocation } from '@/lib/home'
 import CategoryFilter from './CategoryFilter'
 import PinDetail from './PinDetail'
 import Attribution from './Attribution'
@@ -37,14 +38,90 @@ function createPinIcon(category: PinCategory) {
   })
 }
 
+function createHomeIcon() {
+  return L.divIcon({
+    html: `<div style="
+      background:#1D4ED8;
+      width:40px;height:40px;
+      border-radius:8px;
+      border:3px solid white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;line-height:1;
+    ">🏠</div>`,
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  })
+}
+
+function createPreviewIcon() {
+  return L.divIcon({
+    html: `<div style="
+      background:#7C3AED;
+      width:40px;height:40px;
+      border-radius:8px;
+      border:3px solid white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.5);
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;line-height:1;
+    ">🏠</div>`,
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  })
+}
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=jp`
+  const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } })
+  if (!res.ok) return null
+  const data = await res.json()
+  if (!data.length) return null
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), displayName: data[0].display_name }
+}
+
+type HomeModalStage = 'menu' | 'input' | 'confirm'
+
 export default function Map() {
   const mapRef = useRef<HTMLDivElement>(null)
   const leafletMap = useRef<L.Map | null>(null)
   const markersRef = useRef<globalThis.Map<string, L.Marker>>(new globalThis.Map())
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
+  const homeMarkerRef = useRef<L.Marker | null>(null)
+  const previewMarkerRef = useRef<L.Marker | null>(null)
+
   const [activeCategories, setActiveCategories] = useState<Set<PinCategory>>(new Set(ALL_CATEGORIES))
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
   const [locating, setLocating] = useState(true)
+  const [homeLocation, setHomeLocation] = useState<HomeLocation | null>(null)
+
+  // Home modal state
+  const [modalStage, setModalStage] = useState<HomeModalStage | null>(null)
+  const [addressInput, setAddressInput] = useState('')
+  const [geocoding, setGeocoding] = useState(false)
+  const [geocodeError, setGeocodeError] = useState('')
+  const [pendingHome, setPendingHome] = useState<{ lat: number; lng: number; address: string } | null>(null)
+
+  // ホームマーカーの追加/削除
+  function syncHomeMarker(loc: HomeLocation | null) {
+    const map = leafletMap.current
+    if (!map) return
+    if (homeMarkerRef.current) {
+      homeMarkerRef.current.remove()
+      homeMarkerRef.current = null
+    }
+    if (loc) {
+      homeMarkerRef.current = L.marker([loc.lat, loc.lng], { icon: createHomeIcon(), zIndexOffset: 500 }).addTo(map)
+    }
+  }
+
+  function clearPreviewMarker() {
+    if (previewMarkerRef.current) {
+      previewMarkerRef.current.remove()
+      previewMarkerRef.current = null
+    }
+  }
 
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return
@@ -63,7 +140,6 @@ export default function Map() {
     }).addTo(map)
 
     leafletMap.current = map
-
     localStorage.setItem('lastUpdated', new Date().toLocaleDateString('ja-JP'))
 
     const clusterGroup = L.markerClusterGroup({
@@ -85,8 +161,14 @@ export default function Map() {
     clusterGroup.addTo(map)
     clusterGroupRef.current = clusterGroup
 
-    // 起動時に現在地を自動取得して中心に移動する（失敗してもフォールバック）
-    if (navigator.geolocation) {
+    // 自宅登録 → 現在地 → 固定座標の優先順位で初期表示
+    const saved = getHome()
+    if (saved) {
+      setHomeLocation(saved)
+      map.setView([saved.lat, saved.lng], LOCATE_ZOOM)
+      homeMarkerRef.current = L.marker([saved.lat, saved.lng], { icon: createHomeIcon(), zIndexOffset: 500 }).addTo(map)
+      setLocating(false)
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           map.setView([pos.coords.latitude, pos.coords.longitude], LOCATE_ZOOM)
@@ -95,8 +177,7 @@ export default function Map() {
         },
         (err) => {
           setLocating(false)
-          const result = err.code === err.TIMEOUT ? 'timeout' : 'denied'
-          trackEvent('auto_geolocation_result', { result })
+          trackEvent('auto_geolocation_result', { result: err.code === err.TIMEOUT ? 'timeout' : 'denied' })
         },
         { timeout: 5000, maximumAge: 60000 }
       )
@@ -108,6 +189,8 @@ export default function Map() {
       map.remove()
       leafletMap.current = null
       clusterGroupRef.current = null
+      homeMarkerRef.current = null
+      previewMarkerRef.current = null
     }
   }, [])
 
@@ -128,22 +211,88 @@ export default function Map() {
   function toggleCategory(category: PinCategory) {
     setActiveCategories((prev) => {
       const next = new Set(prev)
-      if (next.has(category)) {
-        next.delete(category)
-      } else {
-        next.add(category)
-      }
+      if (next.has(category)) next.delete(category)
+      else next.add(category)
       return next
     })
-    if (selectedPin?.category === category) {
-      setSelectedPin(null)
-    }
+    if (selectedPin?.category === category) setSelectedPin(null)
   }
 
   function locateUser() {
     if (!leafletMap.current) return
     leafletMap.current.locate({ setView: true, maxZoom: LOCATE_ZOOM })
     trackEvent('locate_button_click')
+  }
+
+  function openHomeModal() {
+    if (homeLocation) {
+      setModalStage('menu')
+    } else {
+      setAddressInput('')
+      setGeocodeError('')
+      setModalStage('input')
+    }
+  }
+
+  function closeModal() {
+    setModalStage(null)
+    clearPreviewMarker()
+    setPendingHome(null)
+    setAddressInput('')
+    setGeocodeError('')
+  }
+
+  async function handleGeocode() {
+    if (!addressInput.trim()) return
+    setGeocoding(true)
+    setGeocodeError('')
+    try {
+      const result = await geocodeAddress(addressInput.trim())
+      if (!result) {
+        setGeocodeError('住所が見つかりませんでした。もう少し詳しく入力してください。')
+        setGeocoding(false)
+        return
+      }
+      const pending = { lat: result.lat, lng: result.lng, address: result.displayName }
+      setPendingHome(pending)
+      clearPreviewMarker()
+      const map = leafletMap.current
+      if (map) {
+        previewMarkerRef.current = L.marker([pending.lat, pending.lng], {
+          icon: createPreviewIcon(),
+          zIndexOffset: 600,
+        }).addTo(map)
+        map.setView([pending.lat, pending.lng], LOCATE_ZOOM)
+      }
+      setModalStage('confirm')
+    } catch {
+      setGeocodeError('通信エラーが発生しました。')
+    }
+    setGeocoding(false)
+  }
+
+  function handleConfirmHome() {
+    if (!pendingHome) return
+    setHome(pendingHome)
+    setHomeLocation(pendingHome)
+    syncHomeMarker(pendingHome)
+    clearPreviewMarker()
+    closeModal()
+    trackEvent('home_registered')
+  }
+
+  function handleDeleteHome() {
+    deleteHome()
+    setHomeLocation(null)
+    syncHomeMarker(null)
+    closeModal()
+    trackEvent('home_deleted')
+  }
+
+  function handleChangeHome() {
+    setAddressInput('')
+    setGeocodeError('')
+    setModalStage('input')
   }
 
   return (
@@ -164,6 +313,20 @@ export default function Map() {
 
       <CategoryFilter activeCategories={activeCategories} onToggle={toggleCategory} />
 
+      {/* 自宅ボタン */}
+      <button
+        onClick={openHomeModal}
+        className="absolute bottom-36 right-4 z-[1000] rounded-full w-12 h-12 shadow-md flex items-center justify-center text-2xl hover:opacity-90 active:opacity-80 transition-opacity"
+        style={{
+          backgroundColor: homeLocation ? '#1D4ED8' : '#fff',
+          border: homeLocation ? 'none' : '2px solid #d1d5db',
+        }}
+        aria-label="自宅を登録"
+      >
+        🏠
+      </button>
+
+      {/* 現在地ボタン */}
       <button
         onClick={locateUser}
         className="absolute bottom-20 right-4 z-[1000] bg-white rounded-full w-12 h-12 shadow-md flex items-center justify-center text-2xl hover:bg-gray-50 active:bg-gray-100"
@@ -176,6 +339,97 @@ export default function Map() {
 
       {selectedPin && (
         <PinDetail pin={selectedPin} onClose={() => setSelectedPin(null)} />
+      )}
+
+      {/* 自宅モーダル */}
+      {modalStage && (
+        <div className="absolute inset-0 z-[1500] flex items-end justify-center pb-8 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+
+            {modalStage === 'menu' && (
+              <>
+                <h2 className="text-base font-bold text-gray-800 mb-1">自宅</h2>
+                <p className="text-xs text-gray-500 mb-4 truncate">{homeLocation?.address}</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleChangeHome}
+                    className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700"
+                  >
+                    自宅を変更する
+                  </button>
+                  <button
+                    onClick={handleDeleteHome}
+                    className="w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100"
+                  >
+                    自宅を削除する
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </>
+            )}
+
+            {modalStage === 'input' && (
+              <>
+                <h2 className="text-base font-bold text-gray-800 mb-3">自宅を登録</h2>
+                <input
+                  type="text"
+                  value={addressInput}
+                  onChange={(e) => setAddressInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode() }}
+                  placeholder="例：松山市二番町4丁目7"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm mb-2 outline-none focus:border-blue-500"
+                  autoFocus
+                />
+                {geocodeError && <p className="text-xs text-red-500 mb-2">{geocodeError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={closeModal}
+                    className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleGeocode}
+                    disabled={geocoding || !addressInput.trim()}
+                    className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm disabled:opacity-50"
+                  >
+                    {geocoding ? '検索中…' : '住所を検索'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {modalStage === 'confirm' && pendingHome && (
+              <>
+                <h2 className="text-base font-bold text-gray-800 mb-1">この場所でよろしいですか？</h2>
+                <p className="text-xs text-gray-500 mb-4 leading-relaxed">{pendingHome.address}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      clearPreviewMarker()
+                      setModalStage('input')
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm"
+                  >
+                    戻る
+                  </button>
+                  <button
+                    onClick={handleConfirmHome}
+                    className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm"
+                  >
+                    登録する
+                  </button>
+                </div>
+              </>
+            )}
+
+          </div>
+        </div>
       )}
     </div>
   )
