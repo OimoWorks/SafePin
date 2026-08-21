@@ -41,5 +41,4 @@ __pycache__/
 
 # SafePin data pipeline
 /scripts/raw/
-!/scripts/raw/shelter_overrides.csv
 /lib/pins-data.json

@@ -16,14 +16,18 @@ export default function PinDetail({ pin, onClose }: Props) {
         const d = pin.detail as ShelterDetail
         return (
           <>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500 text-sm">収容人数</span>
-              <span className="font-bold">{d.capacity.toLocaleString()}人</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500 text-sm">備考</span>
-              <span className="font-medium">{d.notes}</span>
-            </div>
+            {d.capacity > 0 && (
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-500 text-sm">収容人数</span>
+                <span className="font-bold">{d.capacity.toLocaleString()}人</span>
+              </div>
+            )}
+            {d.notes && (
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-500 text-sm">備考</span>
+                <span className="font-medium">{d.notes}</span>
+              </div>
+            )}
           </>
         )
       }
@@ -31,10 +35,12 @@ export default function PinDetail({ pin, onClose }: Props) {
         const d = pin.detail as EvacuationSiteDetail
         return (
           <>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-500 text-sm">収容人数</span>
-              <span className="font-bold">{d.capacity > 0 ? `${d.capacity.toLocaleString()}人` : '—'}</span>
-            </div>
+            {d.capacity > 0 && (
+              <div className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-500 text-sm">収容人数</span>
+                <span className="font-bold">{d.capacity.toLocaleString()}人</span>
+              </div>
+            )}
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500 text-sm">備考</span>
               <span className="font-medium">{d.notes}</span>
