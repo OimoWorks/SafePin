@@ -24,8 +24,6 @@ import os
 import re
 import unicodedata
 
-import chardet
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RAW_DIR = os.path.join(SCRIPT_DIR, "raw")
 OUT_PATH = os.path.join(SCRIPT_DIR, "..", "lib", "pins-data.json")
@@ -38,10 +36,10 @@ def read_csv(filename: str) -> list[dict]:
     if not os.path.exists(path):
         return []
     raw = open(path, "rb").read()
-    enc = chardet.detect(raw).get("encoding") or "utf-8"
-    if enc.lower() in ("shift_jis", "shift-jis", "sjis"):
-        enc = "cp932"
-    text = raw.decode(enc, errors="replace")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("cp932", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     return list(reader)
 
